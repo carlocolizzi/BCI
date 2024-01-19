@@ -4,13 +4,31 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib import style
 from collections import deque
-import cv2
 import os
 import random
 import tensorflow as tf
+from pyfirmata import Arduino, SERVO, util
 
 
-MODEL_NAME = "models/61.4-acc-loss-2.39-top.model"  # your model path here. 
+### Arduino Info
+
+port = ''       #port at which arduino is connected here
+pins = [9, 10, 11, 12, 13, 14]      #list pins at which servos are connected here
+board = Arduino(port)
+
+hand_closed = 0
+hand_open = 90
+
+for item in pins:
+    board.digital[item].mode = SERVO
+
+def rotate_servo(pin, angle):
+    board.digital[pin].write(angle)
+    time.sleep(0.015)
+
+### ML code
+
+MODEL_NAME = ""  # your model path here. 
 
 model = tf.keras.models.load_model(MODEL_NAME)
 reshape = (-1, 16, 60)
@@ -67,43 +85,25 @@ for i in range(TOTAL_ITERS):  # how many iterations. Eventually this would be a 
     cur_raw_hz = 1/(sum(fps_counter)/len(fps_counter))
     print(cur_raw_hz)
 
-    env = np.zeros((WIDTH, HEIGHT, 3))
-
-    env[:,HEIGHT//2-5:HEIGHT//2+5,:] = horizontal_line
-    env[WIDTH//2-5:WIDTH//2+5,:,:] = vertical_line
-    env[square['y1']:square['y2'], square['x1']:square['x2']] = box
-
-    cv2.imshow('', env)
-    cv2.waitKey(1)
-
     network_input = np.array(channel_data).reshape(reshape)
     out = model.predict(network_input)
     print(out[0])
 
-    if BOX_MOVE == "random":
-        move = random.choice([-1,0,1])
-        square['x1'] += move
-        square['x2'] += move
-
-    elif BOX_MOVE == "model":
+    if BOX_MOVE == "model":
         choice = np.argmax(out)
-        if choice == 0:
-            if ACTION == "left":
-                correct += 1
-            square['x1'] -= MOVE_SPEED
-            square['x2'] -= MOVE_SPEED
+        if choice == 0:         #left
+            for item in pins:
+                rotate_servo(item, hand_closed)
+
             left += 1
 
-        elif choice == 2:
-            if ACTION == "right":
-                correct += 1
-            square['x1'] += MOVE_SPEED
-            square['x2'] += MOVE_SPEED
+        elif choice == 2:       #right
+            for item in pins:
+                rotate_servo(item, hand_open)
+            
             right += 1
 
         else:
-            if ACTION == "none":
-                correct += 1
             none += 1
 
     total += 1
@@ -111,8 +111,6 @@ for i in range(TOTAL_ITERS):  # how many iterations. Eventually this would be a 
 
     channel_datas.append(channel_data)
 
-#plt.plot(channel_datas[0][0])
-#plt.show()
 
 datadir = "data"
 if not os.path.exists(datadir):

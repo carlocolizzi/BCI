@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-MODEL_NAME = ""
+MODEL_NAME = "models/61.4-acc-loss-2.39-top.model"
 
 CLIP = True  # if your model was trained with np.clip to clip  values
 CLIP_VAL = 10  # if above, what was the value +/-
